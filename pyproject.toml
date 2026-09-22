@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "waix-python"
+version = "0.1.0"
+description = "WAIX WhatsApp API v1: messages, templates, OTP and signed webhooks"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{name = "WAIX"}]
+keywords = ["waix", "whatsapp", "otp", "kazakhstan"]
+classifiers = ["Programming Language :: Python :: 3", "Operating System :: OS Independent"]
+[project.urls]
+Homepage = "https://waix.kz/integrations/python"
+Repository = "https://github.com/ivanpukhov/waix-python"
+Issues = "https://github.com/ivanpukhov/waix-python/issues"
+[tool.setuptools.packages.find]
+where = ["src"]
+[tool.setuptools.package-data]
+waix = ["py.typed"]
