@@ -1,23 +1,30 @@
-# waix-python
+# waix-python — WhatsApp API для Python
 
-Python 3.10+ SDK for WAIX WhatsApp Business API. Uses the Python standard library; type annotations are included. This is a synchronous client: use a worker/thread when calling it from an asynchronous web handler.
+[English](https://github.com/ivanpukhov/waix-python/blob/main/README.en.md)
 
-## Install
+Клиент WAIX для Python 3.10 и новее. Работает на стандартной библиотеке, содержит аннотации типов. Запросы синхронные: в асинхронном веб-приложении вызывайте SDK через рабочий поток.
 
-Install the tagged GitHub release:
+## Установка
 
 ```sh
-python -m pip install "waix-python @ git+https://github.com/ivanpukhov/waix-python.git@v0.1.0"
+python -m pip install waix-python
 ```
 
-## Send an approved template
+[Пакет PyPI](https://pypi.org/project/waix-python/) · [Исходный код](https://github.com/ivanpukhov/waix-python)
+
+## Перед первым запросом
+
+Подключите номер в WAIX, получите Connection ID и серверный ключ с правом `messages:write`. Пример использует одобренный шаблон `order_ready` на русском языке с одной переменной в теле.
+
+## Отправка шаблона
 
 ```python
 import os
 import uuid
 from waix import Waix, WaixError
+
 waix = Waix(os.environ['WAIX_API_KEY'])
-# Persist this UUID with the order/outbox record before calling WAIX.
+# Создайте и сохраните UUID вместе с событием заказа до отправки.
 event_id = str(uuid.uuid4())
 result = waix.messages.send({
     'connection_id': os.environ['WAIX_CONNECTION_ID'],
@@ -30,26 +37,34 @@ result = waix.messages.send({
 print(result['data']['id'], result['data']['status'])
 ```
 
-## OTP, media and webhooks
+## OTP: отправка и проверка
 
 ```python
 otp = Waix(os.environ['WAIX_OTP_PROJECT_KEY'])
 sent = otp.otp.send({'to': '+77071234567', 'ttl': 300}, event_id)
-# Bind sent['data']['id'] to this user's server session.
+# Сохраните sent['data']['id'] в серверной сессии пользователя.
 status = otp.otp.status(sent['data']['id'])
+# supplied_code — код, введённый пользователем в той же сессии.
 verified = otp.otp.verify(sent['data']['id'], supplied_code)
 ```
 
+## Ошибки, файлы и параметры клиента
+
+Перехватывайте `WaixError`. Поля: `status` (0 при сетевой ошибке), `code`, `request_id`, `retry_after`, `body`. Таймаут задаётся в секундах:
+
 ```python
-from waix import verify_webhook
-valid = verify_webhook(raw_body, timestamp_header, signature_header, secret)
+waix = Waix(os.environ['WAIX_API_KEY'], timeout=30, base_url='https://waix.kz/api/v1')
 ```
 
-Catch `WaixError`: `status` (0 for network/timeout), `code`, `request_id`, `retry_after`, `body`. Configure `Waix(key, timeout=30, base_url='https://waix.kz/api/v1')` with timeout in seconds. TLS certificate verification is enabled; configure your OS/Python CA store if needed, rather than disabling verification.
+Проверка TLS-сертификатов включена. Если локальный Python не находит доверенный сертификат, настройте хранилище CA операционной системы или Python; не отключайте проверку TLS.
 
-Upload: `waix.media.upload(connection_id, 'invoice.pdf', content_type='application/pdf', type='document')`. The file is read into memory (up to 100 MB; the API also enforces media-type limits). List messages: `waix.messages.list(limit=50, before=cursor, before_id=cursor_id)`.
+Загрузка файла: `waix.media.upload(connection_id, 'invoice.pdf', content_type='application/pdf', type='document')`. Файл читается в память; предел SDK — 100 МБ, дополнительно действуют ограничения API для типа файла.
 
-## Development
+Пагинация: `waix.messages.list(limit=50, before=cursor, before_id=cursor_id)`.
+
+Проверка вебхука: `verify_webhook(raw_body, timestamp_header, signature_header, secret)`; функция импортируется из `waix`.
+
+## Разработка
 
 ```sh
 PYTHONPATH=src python -m unittest discover -s tests
@@ -57,32 +72,46 @@ python -m pip install build
 python -m build
 ```
 
-## API behavior
+Тесты используют локальный HTTP-сервер и не отправляют сообщения клиентам.
 
-- All calls use `https://waix.kz/api/v1` and return the complete JSON envelope (`data`, plus `pagination` when present).
-- Keep API keys on your server. Never include them in a browser bundle, mobile app or workflow export. Grant only the scopes the integration needs.
-- Create and persist one UUID per logical message before sending. Reuse that UUID and identical payload after network errors. A different key creates a different message. A `202` response means accepted into the queue, not delivered.
-- Requests time out after 30 seconds and do not retry automatically or follow redirects. For HTTP 429 respect `Retry-After`; preserve the original idempotency key. Never blindly retry an `outcome_unknown` message.
-- Start conversations with an approved template. Free-form messages depend on Meta's customer-service window. Collect recipient consent and honor opt-outs.
-- OTP uses a separate project API key. Sandbox returns `test_code` and sends no WhatsApp message. Never expose `test_code` to the user being authenticated. Live OTP requires an available market/package and approved system sender. Check your WAIX dashboard before enabling production traffic.
-- Bind the OTP challenge ID to the requesting user's server session. Only that session may verify it. The SDK does not implement your application's account policy, login session or public-endpoint rate limit.
+## Какие методы есть
 
-## Endpoint coverage
+| Раздел | Возможности |
+| --- | --- |
+| Сообщения | Отправка, список с пагинацией, просмотр, явный повтор |
+| Подключения | Список номеров, чтение и изменение профиля компании |
+| Шаблоны | Список, просмотр, создание, изменение, удаление, предварительный просмотр |
+| Медиа | Загрузка файла, список, получение URL, удаление |
+| Вебхуки | Чтение и изменение настроек, тест, удаление, смена секрета |
+| OTP | Отправка кода, проверка, статус запроса |
 
-Messages: send, list with cursor pagination, get and explicit retry. Connections: list and business profile read/update. Templates: list, get, create, update, delete and preview. Media: list, upload, URL and delete. Workspace webhook: read, update, delete, test and secret rotation. OTP: send, verify and status.
+Все запросы идут на `https://waix.kz/api/v1`. SDK возвращает полный JSON-ответ: `data`, а также `pagination`, если она есть. Для остальных операций API v1 можно использовать метод `request` с относительным путём. Не передавайте в него адрес, полученный от непроверенного пользователя.
 
-Some operations require management scopes or a workspace-level key; a project OTP key cannot manage a workspace webhook. API permissions and schemas: [WAIX API reference](https://waix.kz/openapi-api-v1.json).
+Некоторым операциям нужны права управления и ключ компании. Ключ отдельного OTP-проекта не даёт доступа к настройкам вебхука компании. Список прав и полей: [спецификация API](https://waix.kz/openapi-api-v1.json).
 
-The generic `request` method is available for additional API v1 operations. It accepts only relative API paths; never use it with a destination supplied by an untrusted caller.
+## Повторные запросы и доставка
 
-## Webhook receiver
+Создайте UUID один раз при записи события в своей базе. Передайте его как ключ идемпотентности. При потере ответа повторяйте запрос с **тем же UUID и теми же параметрами**: новый ключ означает новое сообщение.
 
-Verify the signature against the **original raw request bytes before JSON parsing**, using `X-Waix-Timestamp`, `X-Waix-Signature` and your webhook secret. The signing string is `timestamp + "." + rawBody`, HMAC-SHA256, prefixed with `v1=`. Verification uses constant-time comparison and a default 300-second tolerance. Reject invalid requests and deduplicate accepted events by `X-Waix-Delivery`; a valid signature alone does not prevent replay within the time window. Store/process the event durably, then return a 2xx response promptly.
+HTTP `202` означает, что сообщение поставлено в очередь. Доставку проверяйте по вебхуку, журналу WAIX или методу просмотра сообщения. У SDK нет автоматических повторов и переходов по HTTP redirect. Для `429` учитывайте `Retry-After`; ошибки `400`, `401`, `403` требуют исправления параметров или доступа. Сообщение со статусом `outcome_unknown` нельзя повторять вслепую.
 
-## Support and versioning
+## Проверка подписи вебхука
 
-[Documentation](https://waix.kz/docs) · [Support](https://waix.kz/contacts) · [Pricing](https://waix.kz/pricing).
+Передавайте в функцию проверки **исходные байты тела HTTP-запроса до разбора JSON**, заголовки `X-Waix-Timestamp`, `X-Waix-Signature` и секрет вебхука. Подпись: HMAC-SHA256 от `timestamp + "." + rawBody`, с префиксом `v1=`. Сравнение выполняется за постоянное время; допустимое отклонение времени по умолчанию — 300 секунд.
 
-This is the WAIX API v1 client, not the Meta Graph API SDK. SDK versions use SemVer. The client never logs keys, message bodies or OTP codes. If you add application logging, redact those values and retain request IDs for troubleshooting.
+Отклоняйте неверную подпись. Повторные события определяйте по `X-Waix-Delivery`: верная подпись сама по себе не защищает от повторной доставки в пределах допустимого времени. Сначала надёжно сохраните событие, затем ответьте кодом `2xx`.
 
-License: MIT.
+## Ключи, OTP и данные клиентов
+
+- Храните ключи на сервере. Не включайте их в код сайта, мобильного приложения или общий файл сценария. Выдавайте только нужные права.
+- Для первого сообщения клиенту обычно нужен одобренный шаблон. Произвольный текст разрешён в рамках действующего окна обслуживания Meta. Проверяйте согласие клиента и учитывайте отказ от сообщений.
+- OTP использует отдельный ключ проекта. Начните с sandbox: он возвращает `test_code` и не отправляет сообщение WhatsApp. Тестовый код нельзя показывать человеку, чью личность вы проверяете.
+- Сохраните ID OTP-запроса в серверной сессии пользователя. Проверять код должна именно эта сессия. Выдавайте доступ только после успешной проверки; ограничивайте попытки по аккаунту и IP.
+- Для рабочих OTP нужны доступный тариф и одобренный отправитель. Проверьте их состояние в кабинете WAIX до включения реальной отправки.
+- SDK не записывает ключи, сообщения и коды в лог. Если добавляете свои логи, скрывайте эти данные и сохраняйте `request_id` для диагностики.
+
+## Документация и поддержка
+
+[Документация WAIX](https://waix.kz/docs) · [Поддержка](https://waix.kz/contacts) · [Тарифы](https://waix.kz/pricing).
+
+SDK работает с API v1 WAIX. Это не клиент Meta Graph API. Версии SDK следуют SemVer. Лицензия — MIT.
