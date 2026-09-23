@@ -3,7 +3,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 [project]
 name = "waix-python"
-version = "0.1.1"
+version = "0.2.0"
 description = "WAIX WhatsApp API v1: messages, templates, OTP and signed webhooks"
 readme = "README.md"
 requires-python = ">=3.10"
