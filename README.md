@@ -7,10 +7,10 @@
 ## Установка
 
 ```sh
-python -m pip install "waix-python @ git+https://github.com/ivanpukhov/waix-python.git@v0.2.0"
+python -m pip install waix-python
 ```
 
-[Исходный код](https://github.com/ivanpukhov/waix-python)
+[Пакет PyPI](https://pypi.org/project/waix-python/) · [Исходный код](https://github.com/ivanpukhov/waix-python)
 
 ## Перед первым запросом
 

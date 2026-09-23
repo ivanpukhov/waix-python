@@ -9,7 +9,7 @@ Python 3.10+ SDK for WAIX WhatsApp Business API. Uses the Python standard librar
 Install from PyPI:
 
 ```sh
-python -m pip install "waix-python @ git+https://github.com/ivanpukhov/waix-python.git@v0.2.0"
+python -m pip install waix-python
 ```
 
 ## Send an approved template
